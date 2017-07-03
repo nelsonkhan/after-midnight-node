@@ -108,6 +108,7 @@ function gamePrompt () {
       console.log(rules)
       return gamePrompt()
     }
+
     answer
     .split(',')
     .map(die => die.trim())
@@ -116,7 +117,7 @@ function gamePrompt () {
       index > -1 ? game.keepDie(index) : console.warn(`[!] ${ die } is an invalid choice`)
     })
 
-    if(keptLength < game.filterRoll('kept').length) {
+    if (keptLength < game.filterRoll('kept').length) {
       console.log(`KEPT DICE: ${ game.viewDice('kept') }`)
       return playGame()
     }

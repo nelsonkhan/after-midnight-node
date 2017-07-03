@@ -2,7 +2,7 @@
 
 A terminal based version of the classic dice game
 
-##THE RULES
+## THE RULES
 
 ---------
 
