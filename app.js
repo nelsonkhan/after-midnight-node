@@ -1,18 +1,18 @@
 const _ = require('lodash')
 const readline = require('readline')
-
-const rl = readline.createInterface({
+const prompt = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 })
 
 let intro = `
 AFTER MIDNIGHT! 
----------------------
+------------------------
 Coded by Taylor Khan
+Thanks /u/ugwe43to874nf4
 github.com/nelsonkhan
 nelsonkhan.github.io
----------------------
+------------------------
 
 -r to view rules
 `
@@ -35,109 +35,98 @@ The player with the highest 4 dice total wins.
 ---------
 `
 
-let kept = []
-let current_roll
-let dice_left = 6
-let high_score = 0
-
-function roll(times) {
-  let result = []
-  for (i=0; i < times; i++) {
-    result.push(_.random(1, 6))
+let game = {
+  highScore: 0,
+  roll: [
+    { value: 0, status: 'unkept'},
+    { value: 0, status: 'unkept'},
+    { value: 0, status: 'unkept'},    
+    { value: 0, status: 'unkept'},    
+    { value: 0, status: 'unkept'},    
+    { value: 0, status: 'unkept'}
+  ],
+  // randomizes roll, excludes 'kept' dice
+  rollDice () {
+    this.roll = this.roll.map(die => {
+      if (die.status == 'kept') { return die }
+      return { value: _.random(1, 6), status: 'unkept'}
+    })
+  },
+  filterRoll(dieStatus) {
+    return this.roll.filter(die => die.status == dieStatus)
+  },
+  // maps die value
+  viewDice (dieStatus) {
+    return this.filterRoll(dieStatus)
+    .map(die => die.value)
+  },
+  findDieIndex (dieValue) {
+    return this.roll.findIndex(die => die.value == dieValue && die.status == 'unkept')
+  },
+  keepDie (dieIndex) {
+    this.roll[dieIndex].status = 'kept'
+  },
+  rollContains(dieStatus) {
+    return this.roll.find(die => die.status == dieStatus)
+  },
+  generateScore() {
+    let hasFour = this.roll.find(die => die.value == 4)
+    let hasOne = this.roll.find(die => die.value == 1)
+    if (hasFour && hasOne) { return this.roll.reduce((total, current) => {
+      return total + current.value
+    }, -5)}
+    return 0
+  },
+  reset () {
+    this.roll.forEach(die => die.status = 'unkept')
   }
-  return result
 }
 
-function keepPrompt() {
-    console.log(`\n| Current roll: ${current_roll}`)
-    let die_counts = _.countBy(current_roll, Math.floor)
-
-    rl.question("\n Enter any die you want to keep, separated by commas:", answer => {
-      if (answer == '-r') { 
-        console.log(rules) 
-        return keepPrompt()
-      }
-
-      if (!answer.length) { 
-        console.log('[!] You must keep at least one die.')
-        return keepPrompt() 
-      }
-
-      let answer_arr = answer.split(',')
-
-      // if answer is invalid, ask for new input
-      if (!verifyAnswer(die_counts ,answer_arr)) {
-        console.log('\n [!] Your current roll does not have all the dice you selected.')
-        return keepPrompt()
-      }
-
-      // if we get this far the answer was valid, so move
-      // selected dice to the kept array
-      answer_arr
-      .forEach(die => kept.push(die.trim()))
-      console.log(` Your hand: ${kept}`)
-
-      // if there is 6 die kept, the game is over.
-      if (kept.length == 6) { 
-        // player needs a one and a four to qualify
-        if (kept.find(die => die == 1) && kept.find(die => die == 4)) {
-          // add up total score and remove five, as the qualifier dice don't count
-          let score = kept.reduce((a, b) => parseInt(a) + parseInt(b), -5)
-          if (score > high_score) high_score = score
-          console.log(` [*] Final score: ${score}`)
-          // offer to keep playing or quit
-          return restartPrompt()
-        }
-        // if we get this far, the player didnt qualify
-        // offer to keep playing or quit
-        console.log('[!] Your final hand did not contain a four and a one. You lose.')
-        return restartPrompt()
-      } 
-
-      // if there isnt 6 dice kept, keep playing w/
-      // remaining dice
-      current_roll = roll(6 - kept.length)
-      keepPrompt()
+function playGame() {
+  if (game.rollContains('unkept')) {
+    game.rollDice()
+    gamePrompt()
+  }
+  else {
+    if (game.highScore < game.generateScore()) { game.highScore = game.generateScore() }    
+    console.log(`SCORE: ${ game.generateScore() }`)
+    console.log(`HIGHSCORE: ${ game.highScore }`)
+    prompt.question('Continue playing? [y/n]\n', answer => {
+      game.reset()
+      if (answer.toLowerCase() == 'y') { return playGame() }
+      process.exit()
     })
   }
-
-function verifyAnswer(src, input) {
-  // verify that current roll contains each die in answer
-  // innocent until proven guilty
-  let valid_answer = true
-
-  // if there is not enough of a die in current_roll, the answer was invalid
-  input.forEach(die => {
-    if (!src[die.trim()])  return valid_answer = false 
-    src[die.trim()] -= 1
-  })
-  return valid_answer
 }
 
-function restartPrompt() {
-  console.log(` [*] High Score: ${high_score}`)
-  rl.question (
-    `\nTry again? (Y/N)`,
-    answer => {
-      if (_.lowerCase(answer.trim()) == 'y') {
-        kept = []
-        current_roll = roll(6)
-        console.log('\033[2J') // clear the console
-        console.log(intro)
-        return keepPrompt()
-      }
-      process.exit() 
+function gamePrompt () {
+  let keptLength = game.filterRoll('kept').length
+  console.log(`\nROLL: ${ game.viewDice('unkept') }`) 
+
+  prompt.question(`Enter the dice you'd like to keep separated by commas\n`, answer => {
+    if (answer == '-r') {
+      console.log(rules)
+      return gamePrompt()
     }
-  )
+    answer
+    .split(',')
+    .map(die => die.trim())
+    .forEach(die => {
+      let index = game.findDieIndex(die) 
+      index > -1 ? game.keepDie(index) : console.warn(`[!] ${ die } is an invalid choice`)
+    })
+
+    if(keptLength < game.filterRoll('kept').length) {
+      console.log(`KEPT DICE: ${ game.viewDice('kept') }`)
+      return playGame()
+    }
+
+    console.warn('[!] You must select at least one die!')
+    gamePrompt()
+  })
 }
 
-console.log('\033[2J') // clear the console
 
-rl.question(`${intro}
-Press enter to begin!`, 
-answer => {
-  if (answer == '-r') console.log(rules)
-  current_roll = roll(6)
-  keepPrompt()  
-})
-
+console.log('\033[2J')
+console.log(intro)
+playGame()
